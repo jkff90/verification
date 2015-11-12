@@ -1,8 +1,8 @@
 VLOG_OPTS := -timescale 1ps/1ps
 
 VSIM_OPTS := -c -permit_unmatched_virtual_intf -l vsim.log
-VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/x32/uvm_reg
-VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/x32/libsknobs
+VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/i686/uvm_reg
+VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/i686/libsknobs
 
 UVM_TESTNAME := uvm_base_test
 UVM_VERBOSITY := UVM_LOW
