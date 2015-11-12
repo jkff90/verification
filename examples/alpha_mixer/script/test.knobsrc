@@ -1,9 +1,7 @@
-+uvm_test_top.background_idle=5
-+uvm_test_top.foreground_idle=5
-+uvm_test_top.alpha_idle=5
-+uvm_test_top.sink_idle=10
-
 +uvm_test_top.background=../data/background
 +uvm_test_top.foreground=../data/foreground
 +uvm_test_top.alpha=../data/alpha
 +uvm_test_top.sink=../data/sink
+
+//-f ../test/sknobs/normal.sknobs
+-f ../test/sknobs/unusual.sknobs

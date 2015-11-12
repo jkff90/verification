@@ -1,8 +1,8 @@
 VLOG_OPTS := -timescale 1ns/1ns
 
 VSIM_OPTS := -c -permit_unmatched_virtual_intf -l vsim.log
-VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/x32/uvm_reg
-VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/x32/libsknobs
+VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/i686/uvm_reg
+VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/i686/libsknobs
 
 UVM_TESTNAME := video_file_test
 UVM_VERBOSITY := UVM_LOW
@@ -26,4 +26,4 @@ vsim:
 wave:
 	vsim -do "add wave -r /hdl_top/*; radix -h" -view vsim.wlf
 
-.PHONY: all clean vlib vlog vsim wave
+.PHONY: all clean sknobs vlib vlog vsim wave
