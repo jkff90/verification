@@ -26,4 +26,4 @@ vsim:
 wave:
 	vsim -do "add wave -r /hdl_top/*; radix -h" -view vsim.wlf
 
-.PHONY: all clean sknobs vlib vlog vsim wave
+.PHONY: all clean vlib vlog vsim wave
