@@ -1,0 +1,8 @@
++incdir+$PRJ_DIR/tb
++incdir+$PRJ_DIR/test
+
+$PRJ_DIR/tb/tb_pkg.sv
+$PRJ_DIR/test/sequence/sequence_pkg.sv
+$PRJ_DIR/test/testcase/test_pkg.sv
+$PRJ_DIR/tb/hvl_top.sv
+$PRJ_DIR/tb/hdl_top.sv

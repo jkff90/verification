@@ -1,0 +1,7 @@
++incdir+$PRJ_DIR/rtl
+
+$PRJ_DIR/rtl/220model.v
+$PRJ_DIR/rtl/sgate.v
+$PRJ_DIR/rtl/altera_primitives.v
+$PRJ_DIR/rtl/altera_mf.v
+$PRJ_DIR/rtl/alpha_mixer.v
