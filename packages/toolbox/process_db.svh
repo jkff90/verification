@@ -56,5 +56,5 @@ class process_db #(type T=int);
       _db.delete(pid);
     else
       assert(0) else $error("@%0t %m [PID DB] No value is matched for this process", $time);
-  endfunction : get
+  endfunction : delete
 endclass : process_db
