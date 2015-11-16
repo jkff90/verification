@@ -11,16 +11,19 @@ UVM_OPTS += +UVM_TESTNAME=$(UVM_TESTNAME)
 
 all: clean vlog vsim
 
+check:
+	if [ -z $(VERLIB_HOME) ]; then exit 1; fi
+
 clean:
 	rm -rf *.log transcript *.wlf work
 
 vlib:
 	if [ ! -d work ]; then vlib work; fi
 
-vlog: vlib
+vlog: check vlib
 	vlog $(VLOG_OPTS) -f lib.lst -f rtl.lst -f ben.lst | tee vlog.log
 
-vsim:
+vsim: check
 	vsim hdl_top hvl_top $(VSIM_OPTS) $(UVM_OPTS) -do vsim.do
 
 wave:
