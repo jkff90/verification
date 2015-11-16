@@ -2,6 +2,7 @@
 +uvm_test_top.foreground=../data/foreground
 +uvm_test_top.alpha=../data/alpha
 +uvm_test_top.sink=../data/sink
++uvm_test_top.record=UVM_ACTIVE
 
 //-f ../test/sknobs/normal.sknobs
 -f ../test/sknobs/unusual.sknobs

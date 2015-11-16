@@ -66,6 +66,8 @@ endtask : run_phase
 // Function: create_config
 //------------------------------------------------------------------------------
 function void video_file_test::create_config();
+  a2e #(uvm_active_passive_enum) a2e_uvm_active_passive = new();
+
   //! Create
   master_config = avlmm_config::type_id::create("master_config");
   background_config = avlst_video_env_config::type_id::create("background_config");
@@ -97,7 +99,7 @@ function void video_file_test::create_config();
   //
   sink_config.copy(background_config);
   sink_config.avlst.idle_probability = sknobs::get_value({get_full_name(), ".sink_idle"}, 0);
-  sink_config.video.record_active = UVM_ACTIVE;
+  sink_config.video.record_active = a2e_uvm_active_passive.convert(sknobs::get_string({get_full_name(), ".record"}, "UVM_ACTIVE"));
   sink_config.video.record_name = sknobs::get_string({get_full_name(), ".sink"}, "sink");
   //! Print
   background_config.print();

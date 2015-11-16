@@ -11,6 +11,7 @@ $VERLIB_HOME/packages/altera/verbosity_pkg.sv
 $VERLIB_HOME/packages/altera/avalon_utilities_pkg.sv
 $VERLIB_HOME/packages/altera/avalon_mm_pkg.sv
 $VERLIB_HOME/packages/sknobs/sknobs.sv
+$VERLIB_HOME/packages/toolbox/toolbox_pkg.sv
 $VERLIB_HOME/interfaces/interfaces.svh
 $UVC_HOME/uvc_pkg.sv
 $VERLIB_HOME/components/altera_avalon_mm_master_bfm/altera_avalon_mm_master_bfm.sv

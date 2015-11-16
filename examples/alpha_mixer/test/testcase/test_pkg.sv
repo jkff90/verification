@@ -6,6 +6,7 @@ package test_pkg;
   `include "uvm_macros.svh"
   import uvm_pkg::*;
   import uvc_pkg::*;
+  import toolbox_pkg::*;
   import sknobs::*;
   import tb_pkg::*;
   import sequence_pkg::*;
