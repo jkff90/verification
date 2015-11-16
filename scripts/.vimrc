@@ -45,6 +45,8 @@ set nocp
 set incsearch
 set hlsearch
 set wrap
+set linebreak
+set nolist   " list disable linebreak
 set noerrorbells
 set novisualbell
 set tw=0
