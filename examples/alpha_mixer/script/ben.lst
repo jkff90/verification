@@ -1,3 +1,4 @@
++incdir+$UVM_HOME/src
 +incdir+$PRJ_DIR/tb
 +incdir+$PRJ_DIR/test
 
