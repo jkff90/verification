@@ -47,6 +47,8 @@ set hlsearch
 set wrap
 set linebreak
 set nolist   " list disable linebreak
+set textwidth=0
+set wrapmargin=0
 set noerrorbells
 set novisualbell
 set tw=0
