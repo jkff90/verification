@@ -1,0 +1,35 @@
+VLOG_OPTS := -timescale 1ps/1ps
+
+VSIM_OPTS := -c -permit_unmatched_virtual_intf -l vsim.log
+VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/i686/uvm_reg
+VSIM_OPTS += -sv_lib $(VERLIB_HOME)/objects/i686/libsknobs
+
+TESTNAME := uvm_base_test
+VERBOSITY := UVM_LOW
+UVM_OPTS := +UVM_VERBOSITY=$(VERBOSITY)
+UVM_OPTS += +UVM_TESTNAME=$(TESTNAME)
+SEED := $$RANDOM
+
+all: vlog vsim
+
+check:
+	if [ -z $(VERLIB_HOME) ]; then exit 1; fi
+
+clean:
+	rm -rf *.log *.fsdb INCA_libs irun.key
+
+vlib: check
+	if [ ! -d INCA_libs ]; then \
+		irun -c $(VLOG_OPTS) -f inc.lst -f lib.lst; \
+	fi
+
+vlog: vlib
+	irun -c $(VLOG_OPTS) -f inc.lst -f rtl.lst -f ben.lst | tee vlog.log
+
+vsim: check
+	irun -R $(VSIM_OPTS) $(UVM_OPTS) -seed $(SEED) +fsdb+struct
+
+wave:
+	nWave &
+
+.PHONY: all clean vlib vlog vsim wave
