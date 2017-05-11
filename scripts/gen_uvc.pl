@@ -240,7 +240,7 @@ class $class_name extends uvm_sequence_item;
   //extern virtual function void do_print(uvm_printer printer);
   //extern virtual function void do_record(uvm_recorder recorder);
   extern virtual function void do_copy(uvm_object rhs);
-  //extern virtual function bit do_compare(uvm_object rhs, uvm_comparer comparer);
+  extern virtual function bit do_compare(uvm_object rhs, uvm_comparer comparer);
   //extern virtual function void do_pack(uvm_packer packer);
   //extern virtual function void do_unpack(uvm_packer packer);
 endclass : $class_name
@@ -269,6 +269,16 @@ function void $class_name\::do_copy(uvm_object rhs);
   
   assert(\$cast(rhs_, rhs));
 endfunction : do_copy
+
+//------------------------------------------------------------------------------
+// +Function: do_compare
+//------------------------------------------------------------------------------
+function bit $class_name\::do_copy(uvm_object rhs, uvm_comparer comparer);
+  $class_name rhs_;
+  
+  assert(\$cast(rhs_, rhs));
+  return 1;
+endfunction : do_compare
 
 `endif /* __\U$class_name\E_SVH__ */
 END
