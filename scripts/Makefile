@@ -8,6 +8,7 @@ UVM_TESTNAME := uvm_base_test
 UVM_VERBOSITY := UVM_LOW
 UVM_OPTS := +UVM_VERBOSITY=$(UVM_VERBOSITY)
 UVM_OPTS += +UVM_TESTNAME=$(UVM_TESTNAME)
+SEED := $$RANDOM
 
 all: clean vlog vsim
 
@@ -24,7 +25,7 @@ vlog: check vlib
 	vlog $(VLOG_OPTS) -f lib.lst -f rtl.lst -f ben.lst | tee vlog.log
 
 vsim: check
-	vsim hdl_top hvl_top $(VSIM_OPTS) $(UVM_OPTS) -do vsim.do
+	vsim hdl_top hvl_top $(VSIM_OPTS) $(UVM_OPTS) -do vsim.do -seed $(SEED)
 
 wave:
 	vsim -do "add wave -r /hdl_top/*; radix -h" -view vsim.wlf
