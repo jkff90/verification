@@ -95,12 +95,12 @@ task two_sides_scb::run_phase(uvm_phase phase);
     fork
       begin : tx_side
         tx_fifo.get(tx);
-        `uvm_info(get_full_name(), {"TX side get transaction: ", tx.convert2string()}, UVM_LOW)
+        `uvm_info(get_full_name(), {"TX[%0d]  side get transaction: ", tx_cnt, tx.convert2string()}, UVM_LOW)
         tx_cnt++;
       end
       begin : rx_side
         rx_fifo.get(rx);
-        `uvm_info(get_full_name(), {"RX side get transaction: ", rx.convert2string()}, UVM_LOW)
+        `uvm_info(get_full_name(), {"RX[%0d]  side get transaction: ", rx_cnt, rx.convert2string()}, UVM_LOW)
         rx_cnt++;
       end
     join
@@ -126,14 +126,18 @@ function void two_sides_scb::check_phase(uvm_phase phase);
   super.check_phase(phase);
   srvr = get_report_server();
   if(srvr.get_severity_count(UVM_ERROR)) begin
+    $display("%c[1;31m",27);
     $display("||=====================================||");
     $display("||             TEST FAILED             ||");
     $display("||=====================================||");
+    $display("%c[0m",27);
   end
   else begin
+    $write("%c[1;34m",27); 
     $display("||=====================================||");
     $display("||             TEST PASSED             ||");
     $display("||=====================================||");
+    $write("%c[0m",27);
   end
 endfunction : check_phase
 
@@ -162,6 +166,10 @@ endfunction : phase_ready_to_end
 // Function: verify
 //------------------------------------------------------------------------------
 function void two_sides_scb::verify(TX tx, RX rx);
+  if(!tx.compare(rx)) begin
+    `uvm_error(get_full_name(), $sformatf("Transaction mismatch\n- Expected: %s\n- Actual: %s",
+      tx.convert2string(), rx.convert2string()))
+  end
 endfunction : verify
 
 `endif /* __TWO_SIDES_SCB_SVH__ */
