@@ -273,7 +273,7 @@ endfunction : do_copy
 //------------------------------------------------------------------------------
 // +Function: do_compare
 //------------------------------------------------------------------------------
-function bit $class_name\::do_copy(uvm_object rhs, uvm_comparer comparer);
+function bit $class_name\::do_compare(uvm_object rhs, uvm_comparer comparer);
     $class_name rhs_;
     
     assert(\$cast(rhs_, rhs));
@@ -488,9 +488,9 @@ sub gen_sequencer {
 class $class_name extends uvm_sequencer #($iname\_transaction);
     //--- attributes ---
     
-    // obj: _config
+    // obj: cfg
     // Make this visible for accessing from sequences
-    $iname\_config _config;
+    $iname\_config cfg;
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -511,7 +511,7 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     super.build_phase(phase);
 endfunction : build_phase
 
@@ -557,8 +557,8 @@ sub gen_driver {
 //------------------------------------------------------------------------------
 class $class_name extends uvm_driver #($iname\_transaction);
     //--- attributes ---
-    protected $iname\_config _config;  // protect configuration objects from external access
-    protected virtual $iname\_if _vif; // protect interface from external access
+    protected $iname\_config cfg;  // protect configuration objects from external access
+    protected virtual $iname\_if vif; // protect interface from external access
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -580,8 +580,8 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
-    assert(uvm_config_db #(virtual $iname\_if)::get(this, "", "_vif", _vif));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
+    assert(uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif));
     super.build_phase(phase);
 endfunction : build_phase
 
@@ -613,7 +613,7 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_driver #($iname\_transaction);
     //--- attributes ---
-    protected $iname\_config _config; // protect configuration objects from external access
+    protected $iname\_config cfg; // protect configuration objects from external access
     
     //--- TLM ports/exports ---
     
@@ -642,7 +642,7 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     put_port = new("put_port", this);
     super.build_phase(phase);
 endfunction : build_phase
@@ -675,8 +675,8 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_driver #($iname\_transaction);
     //--- attributes ---
-    protected $iname\_config _config;   // protect configuration objects from external access
-    protected $iname\_adapter _adapter; // protect adapter from external access
+    protected $iname\_config cfg;   // protect configuration objects from external access
+    protected $iname\_adapter adapter; // protect adapter from external access
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -698,8 +698,8 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
-    assert(uvm_config_db #($iname\_adapter)::get(this, "", "_adapter", _adapter));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
+    assert(uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter));
     super.build_phase(phase);
 endfunction : build_phase
 
@@ -708,10 +708,10 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 task $class_name\::run_phase(uvm_phase phase);
     super.run_phase(phase);
-    _adapter.init();
+    adapter.init();
     forever begin
         seq_item_port.get_next_item(req);
-        _adapter.push_transaction(req);
+        adapter.push_transaction(req);
         `uvm_info(get_full_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
         seq_item_port.item_done();
     end
@@ -764,8 +764,8 @@ sub gen_monitor {
 //------------------------------------------------------------------------------
 class $class_name extends uvm_component;
     //--- attributes ---
-    protected $iname\_config _config;  // protect configuration objects from external access
-    protected virtual $iname\_if _vif; // protect interface from external access
+    protected $iname\_config cfg;  // protect configuration objects from external access
+    protected virtual $iname\_if vif; // protect interface from external access
     
     //--- TLM ports/exports
     
@@ -793,8 +793,8 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
-    assert(uvm_config_db #(virtual $iname\_if)::get(this, "", "_vif", _vif));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
+    assert(uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif));
     analysis_port = new(\"analysis_port\", this);
     super.build_phase(phase);
 endfunction : build_phase
@@ -829,7 +829,7 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_component;
     //--- attributes ---
-    protected $iname\_config _config;  // protect configuration objects from external access
+    protected $iname\_config cfg;  // protect configuration objects from external access
     
     //--- TLM ports/exports
     
@@ -861,7 +861,7 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     analysis_port = new("analysis_port", this);
     analysis_export = new("analysis_export", this);
     super.build_phase(phase);
@@ -891,8 +891,8 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_component;
     //--- attributes ---
-    protected $iname\_config _config;   // protect configuration objects from external access
-    protected $iname\_adapter _adapter; // protect adapter from external access
+    protected $iname\_config cfg;   // protect configuration objects from external access
+    protected $iname\_adapter adapter; // protect adapter from external access
     
     //--- TLM ports/exports
     
@@ -920,8 +920,8 @@ endfunction : new
 // +Function: build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
-    assert(uvm_config_db #($iname\_config)::get(this, "", "_config", _config));
-    assert(uvm_config_db #($iname\_adapter)::get(this, "", "_adapter", _adapter));
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
+    assert(uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter));
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
 endfunction : build_phase
@@ -933,10 +933,10 @@ task $class_name\::run_phase(uvm_phase phase);
     $iname\_transaction trans;
     
     super.run_phase(phase);
-    _adapter.wait_init();
+    adapter.wait_init();
     forever begin
         trans = $iname\_transaction::type_id::create("trans");
-        _adapter.pop_transaction(trans);
+        adapter.pop_transaction(trans);
         `uvm_info(get_full_name(), {"Get transaction: ", trans.convert2string()}, UVM_HIGH)
         analysis_port.write(trans);
     end
@@ -986,13 +986,13 @@ sub gen_agent {
 class $class_name extends uvm_agent;
     //--- attributes ---
     
-    // object: _config
+    // object: cfg
     // Configuration object for this agent
-    $iname\_config _config;
+    $iname\_config cfg;
     
-    // object: _vif
+    // object: vif
     // Virtual interface for this protocol
-    virtual $iname\_if _vif;
+    virtual $iname\_if vif;
     
     //--- TLM ports/exports ---
     
@@ -1035,39 +1035,39 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
-    if(_config == null) begin
-        if(!uvm_config_db #($iname\_config)::get(this, "", "_config", _config)) begin
+    if(cfg == null) begin
+        if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
         `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-        _config = $iname\_config::type_id::create("_config");
+        cfg = $iname\_config::type_id::create("cfg");
         end
     end
-    if(_vif == null) begin
-        if(!uvm_config_db #(virtual $iname\_if)::get(this, "", "_vif", _vif)) begin
+    if(vif == null) begin
+        if(!uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif)) begin
         `uvm_fatal(get_full_name(), "Virtual interface is not assigned to this agent.")
         end
     end
     // Start building
-    if(_config.is_active == UVM_ACTIVE) begin
+    if(cfg.is_active == UVM_ACTIVE) begin
         sequencer = $iname\_sequencer::type_id::create("sequencer", this);
         driver = $iname\_driver::type_id::create("driver", this);
     end
-    if(_config.has_monitor == 1'b1) begin
+    if(cfg.has_monitor == 1'b1) begin
         monitor = $iname\_monitor::type_id::create("monitor", this);
     end
-    if(_config.has_upper_layer == 1'b1) begin
+    if(cfg.has_upper_layer == 1'b1) begin
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
     // Set configurations
-    if(_config.is_active == UVM_ACTIVE) begin
-        uvm_config_db #($iname\_config)::set(this, "sequencer", "_config", _config);
-        uvm_config_db #($iname\_config)::set(this, "driver", "_config", _config);
-        uvm_config_db #(virtual $iname\_if)::set(this, "driver", "_vif", _vif);
+    if(cfg.is_active == UVM_ACTIVE) begin
+        uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
+        uvm_config_db #($iname\_config)::set(this, "driver", "cfg", cfg);
+        uvm_config_db #(virtual $iname\_if)::set(this, "driver", "vif", vif);
     end
-    if(_config.has_monitor == 1'b1) begin
-        uvm_config_db #($iname\_config)::set(this, "monitor", "_config", _config);
-        uvm_config_db #(virtual $iname\_if)::set(this, "monitor", "_vif", _vif);
+    if(cfg.has_monitor == 1'b1) begin
+        uvm_config_db #($iname\_config)::set(this, "monitor", "cfg", cfg);
+        uvm_config_db #(virtual $iname\_if)::set(this, "monitor", "vif", vif);
     end
 endfunction : build_phase
 
@@ -1076,10 +1076,10 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    if(_config.is_active == UVM_ACTIVE) begin
+    if(cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
     end
-    if(_config.has_monitor == 1'b1) begin
+    if(cfg.has_monitor == 1'b1) begin
         monitor.analysis_port.connect(analysis_port);
     end
 endfunction : connect_phase
@@ -1107,9 +1107,9 @@ END
 class $class_name extends uvm_agent;
     //--- attributes ---
     
-    // object: _config
+    // object: cfg
     // Configuration object for this agent
-    $iname\_config _config;
+    $iname\_config cfg;
     
     //--- TLM ports/exports ---
     
@@ -1161,34 +1161,34 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
-    if(_config == null) begin
-        if(!uvm_config_db #($iname\_config)::get(this, "", "_config", _config)) begin
+    if(cfg == null) begin
+        if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
         `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-        _config = $iname\_config::type_id::create("_config");
+        cfg = $iname\_config::type_id::create("cfg");
         end
     end
     // Start building
-    if(_config.is_active == UVM_ACTIVE) begin
+    if(cfg.is_active == UVM_ACTIVE) begin
         sequencer = $iname\_sequencer::type_id::create("sequencer", this);
         driver = $iname\_driver::type_id::create("driver", this);
         put_port = new("put_port", this);
     end
-    if(_config.has_monitor == 1'b1) begin
+    if(cfg.has_monitor == 1'b1) begin
         monitor = $iname\_monitor::type_id::create("monitor", this);
         analysis_export = new("analysis_export", this);
     end
-    if(_config.has_upper_layer == 1'b1) begin
+    if(cfg.has_upper_layer == 1'b1) begin
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
     // Set configurations
-    if(_config.is_active == UVM_ACTIVE) begin
-        uvm_config_db #($iname\_config)::set(this, "sequencer", "_config", _config);
-        uvm_config_db #($iname\_config)::set(this, "driver", "_config", _config);
+    if(cfg.is_active == UVM_ACTIVE) begin
+        uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
+        uvm_config_db #($iname\_config)::set(this, "driver", "cfg", cfg);
     end
-    if(_config.has_monitor == 1'b1) begin
-        uvm_config_db #($iname\_config)::set(this, "monitor", "_config", _config);
+    if(cfg.has_monitor == 1'b1) begin
+        uvm_config_db #($iname\_config)::set(this, "monitor", "cfg", cfg);
     end
 endfunction : build_phase
 
@@ -1197,11 +1197,11 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    if(_config.is_active == UVM_ACTIVE) begin
+    if(cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
         driver.put_port.connect(put_port);
     end
-    if(_config.has_monitor == 1'b1) begin
+    if(cfg.has_monitor == 1'b1) begin
         analysis_export.connect(monitor.analysis_export);
         monitor.analysis_port.connect(analysis_port);
     end
@@ -1230,13 +1230,13 @@ END
 class $class_name extends uvm_agent;
     //--- attributes ---
     
-    // object: _config
+    // object: cfg
     // Configuration object for this agent
-    $iname\_config _config;
+    $iname\_config cfg;
     
-    // object: _adapter
+    // object: adapter
     // Adapter to lower protocols
-    $iname\_adapter _adapter;
+    $iname\_adapter adapter;
     
     //--- TLM ports/exports ---
     // object: put_export
@@ -1278,39 +1278,39 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
-    if(_config == null) begin
-        if(!uvm_config_db #($iname\_config)::get(this, "", "_config", _config)) begin
+    if(cfg == null) begin
+        if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
         `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-        _config = $iname\_config::type_id::create("_config");
+        cfg = $iname\_config::type_id::create("cfg");
         end
     end
-    if(_adapter == null) begin
-        if(!uvm_config_db #($iname\_adapter)::get(this, "", "_adapter", _adapter)) begin
+    if(adapter == null) begin
+        if(!uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter)) begin
         `uvm_fatal(get_full_name(), "Adapter is not assigned to this agent.")
         end
     end
     // Start building
-    if(_config.is_active == UVM_ACTIVE) begin
+    if(cfg.is_active == UVM_ACTIVE) begin
         sequencer = $iname\_sequencer::type_id::create("sequencer", this);
         driver = $iname\_driver::type_id::create("driver", this);
     end
-    if(_config.has_monitor == 1'b1) begin
+    if(cfg.has_monitor == 1'b1) begin
         monitor = $iname\_monitor::type_id::create("monitor", this);
     end
-    if(_config.has_upper_layer == 1'b1) begin
+    if(cfg.has_upper_layer == 1'b1) begin
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
     // Set configurations
-    if(_config.is_active == UVM_ACTIVE) begin
-        uvm_config_db #($iname\_config)::set(this, "sequencer", "_config", _config);
-        uvm_config_db #($iname\_config)::set(this, "driver", "_config", _config);
-        uvm_config_db #($iname\_adapter)::set(this, "driver", "_adapter", _adapter);
+    if(cfg.is_active == UVM_ACTIVE) begin
+        uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
+        uvm_config_db #($iname\_config)::set(this, "driver", "cfg", cfg);
+        uvm_config_db #($iname\_adapter)::set(this, "driver", "adapter", adapter);
     end
-    if(_config.has_monitor == 1'b1) begin
-        uvm_config_db #($iname\_config)::set(this, "monitor", "_config", _config);
-        uvm_config_db #($iname\_adapter)::set(this, "monitor", "_adapter", _adapter);
+    if(cfg.has_monitor == 1'b1) begin
+        uvm_config_db #($iname\_config)::set(this, "monitor", "cfg", cfg);
+        uvm_config_db #($iname\_adapter)::set(this, "monitor", "adapter", adapter);
     end
 endfunction : build_phase
 
@@ -1319,10 +1319,10 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    if(_config.is_active == UVM_ACTIVE) begin
+    if(cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
     end
-    if(_config.has_monitor == 1'b1) begin
+    if(cfg.has_monitor == 1'b1) begin
         monitor.analysis_port.connect(analysis_port);
     end
 endfunction : connect_phase
@@ -1521,16 +1521,15 @@ sub gen_include {
     my($iname) = @_;
     my $include_name = $iname."_uvc";
     my $body = <<END;
-typdef class $iname\_common
-typdef class $iname\_transaction
-typdef class $iname\_config
-typdef class $iname\_adapter
-typdef class $iname\_sequencer
-typdef class $iname\_driver
-typdef class $iname\_monitor
-typdef class $iname\_agent
-typdef class $iname\_sequence
-typdef class $iname\_passthru_sequence
+typedef class $iname\_transaction;
+typedef class $iname\_config;
+typedef class $iname\_adapter;
+typedef class $iname\_sequencer;
+typedef class $iname\_driver;
+typedef class $iname\_monitor;
+typedef class $iname\_agent;
+typedef class $iname\_sequence;
+typedef class $iname\_passthru_sequence;
 
 `include "$include_name/$iname\_common.svh"
 `include "$include_name/$iname\_transaction.svh"
