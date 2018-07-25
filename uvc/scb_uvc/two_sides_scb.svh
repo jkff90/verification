@@ -33,7 +33,7 @@ class two_sides_scb #(type TX=uvm_object, type RX=TX) extends uvm_component;
   protected uvm_tlm_analysis_fifo #(RX) rx_fifo;
   protected int tx_cnt;
   protected int rx_cnt;
-  protected scb_config _config;
+  protected scb_config cfg;
   
   //--- factory registration ---
   `uvm_component_param_utils(two_sides_scb #(TX, RX))
@@ -61,10 +61,10 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void two_sides_scb::build_phase(uvm_phase phase);
   // Get configurations
-  if(_config == null) begin
-    if(!uvm_config_db #(scb_config)::get(this, "", "_config", _config)) begin
+  if(cfg == null) begin
+    if(!uvm_config_db #(scb_config)::get(this, "", "cfg", cfg)) begin
       `uvm_warning(get_full_name(), "Configuration object is not set to this scoreboard, creating one with default fields.")
-      _config = scb_config::type_id::create("_config");
+      cfg = scb_config::type_id::create("cfg");
     end
   end
   // Start building
@@ -147,7 +147,7 @@ endfunction : check_phase
 // Function: phase_ready_to_end
 //------------------------------------------------------------------------------
 function void two_sides_scb::phase_ready_to_end(uvm_phase phase);
-  if(_config.wait_to_end) begin
+  if(cfg.wait_to_end) begin
     if(phase.get_name() == "run" || phase.get_name() == "main") begin
       if(tx_cnt != rx_cnt) begin
         `uvm_warning(get_full_name(), $sformatf("Transaction count on two sides are different. \
@@ -161,7 +161,7 @@ The ending of this %s phase will be delayed until they are equal.", phase.get_na
                 phase.drop_objection(this);
               end
               begin
-                #(_config.wait_timeout);
+                #(cfg.wait_timeout);
                 `uvm_fatal(get_full_name(), "Timeout while waiting last RX transaction")
               end
             join_any

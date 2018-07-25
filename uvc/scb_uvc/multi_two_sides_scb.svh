@@ -33,7 +33,7 @@ class multi_two_sides_scb #(type TX=uvm_object, type RX=TX) extends uvm_componen
   protected uvm_tlm_analysis_fifo #(RX) rx_fifo [];
   protected int tx_cnt [];
   protected int rx_cnt [];
-  protected scb_config _config;
+  protected scb_config cfg;
   
   //--- factory registration ---
   `uvm_component_param_utils(multi_two_sides_scb #(TX, RX))
@@ -61,19 +61,19 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void multi_two_sides_scb::build_phase(uvm_phase phase);
   // Get configurations
-  if(_config == null) begin
-    if(!uvm_config_db #(scb_config)::get(this, "", "_config", _config)) begin
+  if(cfg == null) begin
+    if(!uvm_config_db #(scb_config)::get(this, "", "cfg", cfg)) begin
       `uvm_warning(get_full_name(), "Configuration object is not set to this scoreboard, creating one with default fields.")
-      _config = scb_config::type_id::create("_config");
+      cfg = scb_config::type_id::create("cfg");
     end
   end
   // Initialize arrays
-  tx_cnt = new[_config.num_pairs];
-  rx_cnt = new[_config.num_pairs];
-  tx_export = new[_config.num_pairs];
-  rx_export = new[_config.num_pairs];
-  tx_fifo = new[_config.num_pairs];
-  rx_fifo = new[_config.num_pairs];
+  tx_cnt = new[cfg.num_pairs];
+  rx_cnt = new[cfg.num_pairs];
+  tx_export = new[cfg.num_pairs];
+  rx_export = new[cfg.num_pairs];
+  tx_fifo = new[cfg.num_pairs];
+  rx_fifo = new[cfg.num_pairs];
   // Start building
   foreach (tx_export[i]) tx_export[i] = new($sformatf("tx_export[%0d]", i), this);
   foreach (rx_export[i]) rx_export[i] = new($sformatf("rx_export[%0d]", i), this);
@@ -98,11 +98,11 @@ task multi_two_sides_scb::run_phase(uvm_phase phase);
   TX tx [];
   RX rx [];
   
-  tx = new[_config.num_pairs];
-  rx = new[_config.num_pairs];
+  tx = new[cfg.num_pairs];
+  rx = new[cfg.num_pairs];
   super.run_phase(phase);
   forever begin
-    for (int i = 0; i < _config.num_pairs; i++) begin
+    for (int i = 0; i < cfg.num_pairs; i++) begin
       automatic int idx = i;
       fork
         begin : per_pair
@@ -163,7 +163,7 @@ endfunction : check_phase
 // Function: phase_ready_to_end
 //------------------------------------------------------------------------------
 function void multi_two_sides_scb::phase_ready_to_end(uvm_phase phase);
-  if(_config.wait_to_end) begin
+  if(cfg.wait_to_end) begin
     if(phase.get_name() == "run" || phase.get_name() == "main") begin
       foreach (tx_cnt[i]) begin
         automatic int idx = i;
@@ -178,7 +178,7 @@ function void multi_two_sides_scb::phase_ready_to_end(uvm_phase phase);
                   phase.drop_objection(this);
                 end
                 begin
-                  #(_config.wait_timeout);
+                  #(cfg.wait_timeout);
                   `uvm_fatal(get_full_name(), "Timeout while waiting last RX transaction")
                 end
               join_any
