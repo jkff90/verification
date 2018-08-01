@@ -45,7 +45,6 @@ class multi_two_sides_scb #(type TX=uvm_object, type RX=TX) extends uvm_componen
   extern virtual task run_phase(uvm_phase phase);
   extern virtual function void phase_ready_to_end(uvm_phase phase);
   extern virtual function void extract_phase(uvm_phase phase);
-  extern virtual function void check_phase(uvm_phase phase);
   extern virtual protected function void verify(TX tx, RX rx);
 endclass : multi_two_sides_scb
 
@@ -133,31 +132,6 @@ function void multi_two_sides_scb::extract_phase(uvm_phase phase);
   `uvm_info(get_full_name(), $psprintf("TX side get total %0d transaction", tx_cnt), UVM_NONE)
   `uvm_info(get_full_name(), $psprintf("RX side get total %0d transaction", rx_cnt), UVM_NONE)
 endfunction : extract_phase
-
-//------------------------------------------------------------------------------
-// Function: check_phase
-//------------------------------------------------------------------------------
-function void multi_two_sides_scb::check_phase(uvm_phase phase);
-  uvm_report_server srvr;
-  
-  super.check_phase(phase);
-  //srvr = get_report_server(); // 1.1d
-  srvr = uvm_report_server::get_server(); // 1.2, all the UVM features are accessed via UVM coresevice
-  if(srvr.get_severity_count(UVM_ERROR)) begin
-    $display("%c[1;31m",27);
-    $display("||=====================================||");
-    $display("||             TEST FAILED             ||");
-    $display("||=====================================||");
-    $display("%c[0m",27);
-  end
-  else begin
-    $write("%c[1;34m",27); 
-    $display("||=====================================||");
-    $display("||             TEST PASSED             ||");
-    $display("||=====================================||");
-    $write("%c[0m",27);
-  end
-endfunction : check_phase
 
 //------------------------------------------------------------------------------
 // Function: phase_ready_to_end

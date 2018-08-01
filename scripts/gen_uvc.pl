@@ -168,6 +168,7 @@ sub gen_uvc {
     &gen_passthru_sequence($iname);
     &gen_include($iname);
     &gen_package($iname);
+    &gen_interface($iname);
 }
 
 
@@ -767,7 +768,7 @@ class $class_name extends uvm_component;
     protected $iname\_config cfg;  // protect configuration objects from external access
     protected virtual $iname\_if vif; // protect interface from external access
     
-    //--- TLM ports/exports
+    //--- TLM ports/exports ---
     
     // object: analysis_port
     // Analysis port that sends monitored transactions to upper layers
@@ -809,7 +810,7 @@ task $class_name\::run_phase(uvm_phase phase);
     forever begin
         trans = $iname\_transaction::type_id::create("trans");
         // Monitor signals
-        `uvm_info(get_full_name(), {"Get transaction: ", trans.convert2string()}, UVM_HIGH)
+        `uvm_info(get_full_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
         analysis_port.write(trans);
     end
 endtask : run_phase
@@ -831,7 +832,7 @@ class $class_name extends uvm_component;
     //--- attributes ---
     protected $iname\_config cfg;  // protect configuration objects from external access
     
-    //--- TLM ports/exports
+    //--- TLM ports/exports ---
     
     // object: analysis_port
     // Analysis port that sends monitored transactions to upper layers
@@ -872,7 +873,7 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::write($iname\_transaction trans);
     // Protocol check
-    `uvm_info(get_full_name(), {"Get transaction: ", trans.convert2string()}, UVM_HIGH)
+    `uvm_info(get_full_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
     analysis_port.write(trans);
 endfunction : write
 
@@ -894,7 +895,7 @@ class $class_name extends uvm_component;
     protected $iname\_config cfg;   // protect configuration objects from external access
     protected $iname\_adapter adapter; // protect adapter from external access
     
-    //--- TLM ports/exports
+    //--- TLM ports/exports ---
     
     // object: analysis_port
     // Analysis port that sends monitored transactions to upper layers
@@ -937,7 +938,7 @@ task $class_name\::run_phase(uvm_phase phase);
     forever begin
         trans = $iname\_transaction::type_id::create("trans");
         adapter.pop_transaction(trans);
-        `uvm_info(get_full_name(), {"Get transaction: ", trans.convert2string()}, UVM_HIGH)
+        `uvm_info(get_full_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
         analysis_port.write(trans);
     end
 endtask : run_phase
@@ -1037,13 +1038,13 @@ function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
     if(cfg == null) begin
         if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
-        `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-        cfg = $iname\_config::type_id::create("cfg");
+            `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
+            cfg = $iname\_config::type_id::create("cfg");
         end
     end
     if(vif == null) begin
         if(!uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif)) begin
-        `uvm_fatal(get_full_name(), "Virtual interface is not assigned to this agent.")
+            `uvm_fatal(get_full_name(), "Virtual interface is not assigned to this agent.")
         end
     end
     // Start building
@@ -1163,8 +1164,8 @@ function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
     if(cfg == null) begin
         if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
-        `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-        cfg = $iname\_config::type_id::create("cfg");
+            `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
+            cfg = $iname\_config::type_id::create("cfg");
         end
     end
     // Start building
@@ -1280,13 +1281,13 @@ function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
     if(cfg == null) begin
         if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
-        `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-        cfg = $iname\_config::type_id::create("cfg");
+            `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
+            cfg = $iname\_config::type_id::create("cfg");
         end
     end
     if(adapter == null) begin
         if(!uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter)) begin
-        `uvm_fatal(get_full_name(), "Adapter is not assigned to this agent.")
+            `uvm_fatal(get_full_name(), "Adapter is not assigned to this agent.")
         end
     end
     // Start building
@@ -1585,6 +1586,41 @@ END
     update_header("$package_name.sv");
     open(FILE, ">$package_name.sv");
     print "Packing all files in package $package_name.sv .....\n";
+    print(FILE $header);
+    print(FILE $body);
+    print(FILE $footer);
+    close(FILE);
+}
+
+
+#===============================================================================
+# Subroutine: gen_interface
+#
+# Descriptions:
+#   + Generate protocol interface
+#
+# Inputs:
+#   + Name of the protocol
+#
+# Outputs:
+#   + None
+#===============================================================================
+sub gen_interface {
+    my($iname) = @_;
+    my $interface_name = $iname."_if";
+    my $body = <<END;
+//------------------------------------------------------------------------------
+// INTERFACE: $interface_name
+//
+// Interface for $iname protocol
+//------------------------------------------------------------------------------
+interface $interface_name;
+endinterface : $interface_name
+END
+
+    update_header("$interface_name.sv");
+    open(FILE, ">$interface_name.sv");
+    print "Generating interface $interface_name.sv .....\n";
     print(FILE $header);
     print(FILE $body);
     print(FILE $footer);
