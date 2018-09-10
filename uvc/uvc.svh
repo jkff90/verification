@@ -1,4 +1,5 @@
-`include "avlmm_uvc/avlmm_uvc.svh"
+`include "amba_axi4_uvc/amba_axi4_uvc.svh"
+`include "avlst_uvc/avlst_uvc.svh"
 `include "avlst_uvc/avlst_uvc.svh"
 `include "i2c_uvc/i2c_uvc.svh"
 `include "irq_uvc/irq_uvc.svh"
