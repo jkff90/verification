@@ -24,6 +24,8 @@ module hdl_top;
 
   clk_if #(6) st_clk();
   
+  backdoor_if backdoor();
+  
   altera_avalon_mm_if #(
     .AV_ADDRESS_W             (6),
     .AV_SYMBOL_W              (8),

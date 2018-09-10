@@ -4,5 +4,6 @@
 # It is actually "how I was called"
 # So dir=`dirname $0` will return "/bin/bash" if calling by "source"
 export VERILIB_HOME="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-export UVM_HOME=$VERILIB_HOME/frameworks/uvm-1.1d
+#export UVM_HOME=$VERILIB_HOME/frameworks/uvm-1.1d
+export UVM_HOME=$VERILIB_HOME/frameworks/uvm-1.2
 export UVC_HOME=$VERILIB_HOME/uvc

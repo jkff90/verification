@@ -27,6 +27,7 @@ module hvl_top;
     uvm_config_db #(avlst_adapter)::set(null, "uvm_test_top.env.background_env.avlst", "_adapter", hdl_top.aso_background_wrapper.adapter);
     uvm_config_db #(avlst_adapter)::set(null, "uvm_test_top.env.foreground_env.avlst", "_adapter", hdl_top.aso_foreground_wrapper.adapter);
     uvm_config_db #(avlst_adapter)::set(null, "uvm_test_top.env.sink_env.avlst", "_adapter", hdl_top.asi_wrapper.adapter);
+    uvm_config_db #(avlst_adapter)::set(null, "broadcast", "backdoor", hdl_top.backdoor);
     run_test("base_test");
   end
   
@@ -35,5 +36,5 @@ module hvl_top;
     #100 hdl_top.mm_clk.asynchronous_reset(199);
   end
   
-  always #1ms $display("@%0t Simulation is running .......", $time);
+  heartbeat i_heartbeat();
 endmodule : hvl_top
