@@ -1,3 +1,4 @@
+`include "interfaces/backdoor_if.sv"
 `include "interfaces/clk_if.sv"
 `include "interfaces/freq_clk_if.sv"
 `include "interfaces/i2c_if.sv"

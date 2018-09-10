@@ -1,5 +1,5 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-//  This file <uvm_final_check.svh> is a part of <Verification> project
+//  This file <heartbeat.sv> is a part of <Verification> project
 //  Copyright (C) 2015  An Pham (anphambk@gmail.com)
 //
 //  This program is free software: you can redistribute it and/or modify
@@ -17,27 +17,47 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 //------------------------------------------------------------------------------
-// MODULE: uvm_final_check
+// MODULE: heartbeat
 //
-// Performs final checking for UVM based environment and print out the test result.
-// Requires uvm_pkg 1.1d or higher.
+// + Heartbeating, display information to show that the whole environment is running.
+// + Performs final checking for UVM based environment and prints out the test result.
+// + Requires uvm_pkg 1.1d or higher.
 //------------------------------------------------------------------------------
-module uvm_final_check();
-    import uvm_pkg::*;
+module heartbeat #(
+    parameter time HEARTBEAT = 1_000_000
+)(
+);
     `include "uvm_macros.svh"
+    import uvm_pkg::*;
 
+    uvm_event heartbeat;
+
+    initial begin
+        assert(HEARTBEAT >= 1_000_000)
+        else `uvm_fatal($sformatf("%m"), $sformatf("The beat cycle is too short: cycle=%0t!", HEARTBEAT))
+        heartbeat = new("heartbeat");
+        uvm_config_db #(uvm_event)::set(null, "*", "heartbeat", heartbeat);
+    end
+    
+    always #HEARTBEAT begin
+        $display("@ %0t: [%m] Beating ...", $time);
+        heartbeat.trigger();
+    end
+    
     final begin : final_block
-        uvm_root top;
-        uvm_report_server srvr;
+        uvm_root root;
+        uvm_report_server rsvr;
         
+        rsvr = uvm_report_server::get_server();
         // Check all phases are done
-        top = uvm_root::get();
-        if (top.m_phase_all_done != 1) begin
-            `uvm_error($sformatf("%m"), "Not all of the UVM phases are done. The environment is termnitated somewhere!")
+        if (!$test$plusargs("heartbeat.nocheck")) begin
+            root = uvm_root::get();
+            if (root.m_phase_all_done != 1) begin
+                `uvm_error($sformatf("%m"), "Not all of the UVM phases are done. The environment is termnitated somewhere!")
+            end
         end
         // Check UVM report
-        srvr = uvm_report_server::get_server();
-        if(srvr.get_severity_count(UVM_ERROR) || srvr.get_severity_count(UVM_FATAL)) begin
+        if(rsvr.get_severity_count(UVM_ERROR) || rsvr.get_severity_count(UVM_FATAL)) begin
             $display("%c[1;31m",27);
             $display("||=====================================||");
             $display("||             TEST FAILED             ||");
@@ -52,4 +72,4 @@ module uvm_final_check();
             $write("%c[0m",27);
         end
     end
-endmodule : uvm_final_check
+endmodule : heartbeat
