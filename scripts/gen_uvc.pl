@@ -163,6 +163,7 @@ sub gen_uvc {
     &gen_sequencer($iname);
     &gen_driver($iname, $type);
     &gen_monitor($iname, $type);
+    &gen_coverage($iname, $type);
     &gen_agent($iname, $type);
     &gen_sequence($iname);
     &gen_passthru_sequence($iname);
@@ -332,6 +333,10 @@ class $class_name extends uvm_object;
     // Decide whether the agent has the monitor
     bit has_monitor = 1;
     
+    // bit: enable_coverage = 0
+    // Enable the coverage collector, only valid of has_monitor is one.
+    bit enable_coverage = 0;
+    
     //--- constraints ---
     
     //--- factory registration ---
@@ -357,6 +362,7 @@ function void $class_name\::do_print(uvm_printer printer);
     printer.print_string("Agent mode", is_active.name());
     printer.print_int("Has upper layer", has_upper_layer, 1);
     printer.print_int("Has monitor", has_monitor, 1);
+    printer.print_int("Enable coverage", enable_coverage, 1);
 endfunction : do_print
 
 //------------------------------------------------------------------------------
@@ -369,6 +375,7 @@ function void $class_name\::do_copy(uvm_object rhs);
     is_active = rhs_.is_active;
     has_upper_layer = rhs_.has_upper_layer;
     has_monitor = rhs_.has_monitor;
+    enable_coverage = rhs_.enable_coverage;
 endfunction : do_copy
 
 `endif /* __\U$class_name\E_SVH__ */
@@ -958,6 +965,95 @@ END
 
 
 #===============================================================================
+# Subroutine: gen_coverage
+#
+# Descriptions:
+#   + Generate protocol UVC coverage collector file #
+#
+# Inputs:
+#   + Name of the protocol
+#
+# Outputs:
+#   + None
+#===============================================================================
+sub gen_coverage {
+    my($iname) = @_;
+    my $class_name = $iname."_coverage";
+    my $body = <<END;
+`ifndef __\U$class_name\E_SVH__
+`define __\U$class_name\E_SVH__
+
+//------------------------------------------------------------------------------
+// CLASS: $class_name
+//
+// Coverage collector for $iname protocol
+//------------------------------------------------------------------------------
+class $class_name extends uvm_component;
+    //--- attributes ---
+    
+    protected $iname\_transaction m_trans; // proctected transaction to sample
+    protected $iname\_config cfg;
+    
+    //--- TLM ports/exports ---
+    
+    // object: analysis_export
+    // Coverage collector's analysis_export.
+    // This port should be connected to monitor's analysis_port in order to sample the transactions.
+    uvm_analysis_imp #($iname\_transaction, $class_name) analysis_export;
+    
+    //--- coverage ---
+    covergroup cg_trans;
+        option.per_instance = 1;
+    endgroup : cg_trans
+    
+    //--- factory registration ---
+    `uvm_component_utils($class_name)
+    
+    //--- methods ---
+    extern function new(string name="$class_name", uvm_component parent=null);
+    extern virtual function void build_phase(uvm_phase phase);
+    extern virtual function void write($iname\_transaction trans);
+endclass : $class_name
+
+//------------------------------------------------------------------------------
+// +Constructor: new
+//------------------------------------------------------------------------------
+function $class_name\::new(string name="$class_name", uvm_component parent=null);
+    super.new(name, parent);
+    cg_trans = new();
+endfunction : new
+
+//------------------------------------------------------------------------------
+// +Function: build_phase
+//------------------------------------------------------------------------------
+function void $class_name\::build_phase(uvm_phase phase);
+    assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
+    analysis_export = new("analysis_export", this);
+    super.build_phase(phase);
+endfunction : build_phase
+
+//------------------------------------------------------------------------------
+// +Function: write
+//------------------------------------------------------------------------------
+function void $class_name\::write($iname\_transaction trans);
+    m_trans = trans;
+    cg_trans.sample();
+endfunction : write
+
+`endif /* __\U$class_name\E_SVH__ */
+END
+
+  update_header("$class_name.svh");
+  open(FILE, ">$class_name.svh");
+  print "Generating $class_name.svh .....\n";
+  print(FILE $header);
+  print(FILE $body);
+  print(FILE $footer);
+  close(FILE);
+}
+
+
+#===============================================================================
 # Subroutine: gen_agent
 #
 # Descriptions:
@@ -974,7 +1070,7 @@ sub gen_agent {
     my $class_name = $iname."_agent";
     my $body;
     
-    if($type == 0) {
+    if($type == 0) { # Virtual interface
         $body = <<END;
 `ifndef __\U$class_name\E_SVH__
 `define __\U$class_name\E_SVH__
@@ -1007,12 +1103,16 @@ class $class_name extends uvm_agent;
     uvm_analysis_port #($iname\_transaction) analysis_port;
     
     //--- children ---
-    protected $iname\_driver driver;   // user should not access to driver directly
-    protected $iname\_monitor monitor; // user should not access to monitor directly
+    /*protected*/ $iname\_driver driver;   // user should not access to driver directly
+    /*protected*/ $iname\_monitor monitor; // user should not access to monitor directly
     
     // object: sequencer
     // UVM sequencer for <$iname\_transaction> type
     $iname\_sequencer sequencer;
+    
+    // object: coverage
+    // Coverage collector for <$iname\_transaction> type
+    $iname\_coverage coverage;
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -1021,6 +1121,7 @@ class $class_name extends uvm_agent;
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual function void connect_phase(uvm_phase phase);
+    extern virtual function void start_of_simulation_phase(uvm_phase phase);
     extern virtual task put($iname\_transaction t);
 endclass : $class_name
 
@@ -1036,39 +1137,45 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
-    if(cfg == null) begin
-        if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
+    if (cfg == null) begin
+        if (!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
             `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
             cfg = $iname\_config::type_id::create("cfg");
         end
     end
-    if(vif == null) begin
-        if(!uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif)) begin
+    if (vif == null) begin
+        if (!uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif)) begin
             `uvm_fatal(get_full_name(), "Virtual interface is not assigned to this agent.")
         end
     end
     // Start building
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         sequencer = $iname\_sequencer::type_id::create("sequencer", this);
         driver = $iname\_driver::type_id::create("driver", this);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         monitor = $iname\_monitor::type_id::create("monitor", this);
+        if (cfg.enable_coverage == 1'b1) begin
+            coverage = $iname\_coverage::type_id::create("coverage", this);
+        end
     end
-    if(cfg.has_upper_layer == 1'b1) begin
+    if (cfg.has_upper_layer == 1'b1) begin
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
     // Set configurations
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
         uvm_config_db #($iname\_config)::set(this, "driver", "cfg", cfg);
         uvm_config_db #(virtual $iname\_if)::set(this, "driver", "vif", vif);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         uvm_config_db #($iname\_config)::set(this, "monitor", "cfg", cfg);
         uvm_config_db #(virtual $iname\_if)::set(this, "monitor", "vif", vif);
+        if (cfg.enable_coverage == 1'b1) begin
+            uvm_config_db #($iname\_config)::set(this, "coverage", "cfg", cfg);
+        end
     end
 endfunction : build_phase
 
@@ -1077,13 +1184,24 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         monitor.analysis_port.connect(analysis_port);
+        if (cfg.enable_coverage == 1'b1) begin
+            monitor.analysis_port.connect(coverage.analysis_export);
+        end
     end
 endfunction : connect_phase
+
+//------------------------------------------------------------------------------
+// +Function: start_of_simulation_phase
+//------------------------------------------------------------------------------
+function void $class_name\::start_of_simulation_phase(uvm_phase phase);
+    super.start_of_simulation_phase(phase);
+    `uvm_info(get_full_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
+endfunction : start_of_simulation_phase
 
 //------------------------------------------------------------------------------
 // +Method: put
@@ -1095,7 +1213,7 @@ endtask : put
 `endif /* __\U$class_name\E_SVH__ */
 END
     }
-    elsif($type == 1) {
+    elsif($type == 1) { # Put port
         $body = <<END;
 `ifndef __\U$class_name\E_SVH__
 `define __\U$class_name\E_SVH__
@@ -1133,12 +1251,16 @@ class $class_name extends uvm_agent;
     uvm_analysis_export #($iname\_transaction) analysis_export;
     
     //--- children ---
-    protected $iname\_driver driver;   // user should not access to driver directly
-    protected $iname\_monitor monitor; // user should not access to monitor directly
+    /*protected*/ $iname\_driver driver;   // user should not access to driver directly
+    /*protected*/ $iname\_monitor monitor; // user should not access to monitor directly
     
     // object: sequencer
     // UVM sequencer for <$iname\_transaction> type
     $iname\_sequencer sequencer;
+    
+    // object: coverage
+    // Coverage collector for <$iname\_transaction> type
+    $iname\_coverage coverage;
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -1147,6 +1269,7 @@ class $class_name extends uvm_agent;
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual function void connect_phase(uvm_phase phase);
+    extern virtual function void start_of_simulation_phase(uvm_phase phase);
     extern virtual task put($iname\_transaction t);
 endclass : $class_name
 
@@ -1162,34 +1285,40 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
-    if(cfg == null) begin
-        if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
+    if (cfg == null) begin
+        if (!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
             `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
             cfg = $iname\_config::type_id::create("cfg");
         end
     end
     // Start building
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         sequencer = $iname\_sequencer::type_id::create("sequencer", this);
         driver = $iname\_driver::type_id::create("driver", this);
         put_port = new("put_port", this);
     end
-    if(cfg.has_monitor == 1'b1) begin
-        monitor = $iname\_monitor::type_id::create("monitor", this);
+    if (cfg.has_monitor == 1'b1) begin
         analysis_export = new("analysis_export", this);
+        monitor = $iname\_monitor::type_id::create("monitor", this);
+        if (cfg.enable_coverage == 1'b1) begin
+            coverage = $iname\_coverage::type_id::create("coverage", this);
+        end
     end
-    if(cfg.has_upper_layer == 1'b1) begin
+    if (cfg.has_upper_layer == 1'b1) begin
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
     // Set configurations
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
         uvm_config_db #($iname\_config)::set(this, "driver", "cfg", cfg);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         uvm_config_db #($iname\_config)::set(this, "monitor", "cfg", cfg);
+        if (cfg.enable_coverage == 1'b1) begin
+            uvm_config_db #($iname\_config)::set(this, "coverage", "cfg", cfg);
+        end
     end
 endfunction : build_phase
 
@@ -1198,15 +1327,26 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
         driver.put_port.connect(put_port);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         analysis_export.connect(monitor.analysis_export);
         monitor.analysis_port.connect(analysis_port);
+        if (cfg.enable_coverage == 1'b1) begin
+            monitor.analysis_port.connect(coverage.analysis_export);
+        end
     end
 endfunction : connect_phase
+
+//------------------------------------------------------------------------------
+// +Function: start_of_simulation_phase
+//------------------------------------------------------------------------------
+function void $class_name\::start_of_simulation_phase(uvm_phase phase);
+    super.start_of_simulation_phase(phase);
+    `uvm_info(get_full_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
+endfunction : start_of_simulation_phase
 
 //------------------------------------------------------------------------------
 // +Method: put
@@ -1218,7 +1358,7 @@ endtask : put
 `endif /* __\U$class_name\E_SVH__ */
 END
     }
-    else {
+    else { # Adapter
         $body = <<END;
 `ifndef __\U$class_name\E_SVH__
 `define __\U$class_name\E_SVH__
@@ -1250,12 +1390,16 @@ class $class_name extends uvm_agent;
     uvm_analysis_port #($iname\_transaction) analysis_port;
     
     //--- children ---
-    protected $iname\_driver driver;   // user should not access to driver directly
-    protected $iname\_monitor monitor; // user should not access to monitor directly
+    /*protected*/ $iname\_driver driver;    // user should not access to driver directly
+    /*protected*/ $iname\_monitor monitor;  // user should not access to monitor directly
     
     // object: sequencer
     // UVM sequencer for <$iname\_transaction> type
     $iname\_sequencer sequencer;
+    
+    // object: coverage
+    // Coverage collector for <$iname\_transaction> type
+    $iname\_coverage coverage;
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -1264,6 +1408,7 @@ class $class_name extends uvm_agent;
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual function void connect_phase(uvm_phase phase);
+    extern virtual function void start_of_simulation_phase(uvm_phase phase);
     extern virtual task put($iname\_transaction t);
 endclass : $class_name
 
@@ -1279,39 +1424,45 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
-    if(cfg == null) begin
-        if(!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
+    if (cfg == null) begin
+        if (!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
             `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
             cfg = $iname\_config::type_id::create("cfg");
         end
     end
-    if(adapter == null) begin
-        if(!uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter)) begin
+    if (adapter == null) begin
+        if (!uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter)) begin
             `uvm_fatal(get_full_name(), "Adapter is not assigned to this agent.")
         end
     end
     // Start building
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         sequencer = $iname\_sequencer::type_id::create("sequencer", this);
         driver = $iname\_driver::type_id::create("driver", this);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         monitor = $iname\_monitor::type_id::create("monitor", this);
+        if (cfg.enable_coverage == 1'b1) begin
+            coverage = $iname\_coverage::type_id::create("coverage", this);
+        end
     end
-    if(cfg.has_upper_layer == 1'b1) begin
+    if (cfg.has_upper_layer == 1'b1) begin
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
     super.build_phase(phase);
     // Set configurations
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
         uvm_config_db #($iname\_config)::set(this, "driver", "cfg", cfg);
         uvm_config_db #($iname\_adapter)::set(this, "driver", "adapter", adapter);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         uvm_config_db #($iname\_config)::set(this, "monitor", "cfg", cfg);
         uvm_config_db #($iname\_adapter)::set(this, "monitor", "adapter", adapter);
+        if (cfg.enable_coverage == 1'b1) begin
+            uvm_config_db #($iname\_config)::set(this, "coverage", "cfg", cfg);
+        end
     end
 endfunction : build_phase
 
@@ -1320,13 +1471,24 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    if(cfg.is_active == UVM_ACTIVE) begin
+    if (cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
     end
-    if(cfg.has_monitor == 1'b1) begin
+    if (cfg.has_monitor == 1'b1) begin
         monitor.analysis_port.connect(analysis_port);
+        if (cfg.enable_coverage == 1'b1) begin
+            monitor.analysis_port.connect(coverage.analysis_export);
+        end
     end
 endfunction : connect_phase
+
+//------------------------------------------------------------------------------
+// +Function: start_of_simulation_phase
+//------------------------------------------------------------------------------
+function void $class_name\::start_of_simulation_phase(uvm_phase phase);
+    super.start_of_simulation_phase(phase);
+    `uvm_info(get_full_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
+endfunction : start_of_simulation_phase
 
 //------------------------------------------------------------------------------
 // +Method: put
@@ -1376,6 +1538,10 @@ sub gen_sequence {
 class $class_name extends uvm_sequence #($iname\_transaction);
     //--- attributes ---
     
+    // int: num
+    // Number of transactions will be sent
+    int num = 100;
+    
     //--- factory registration ---
     `uvm_object_utils($class_name)
     `uvm_declare_p_sequencer($iname\_sequencer)
@@ -1396,13 +1562,16 @@ endfunction : new
 // +Method: body
 //------------------------------------------------------------------------------
 task $class_name\::body();
-    req = $iname\_transaction::type_id::create("req");
-    start_item(req);
-    `ifndef DISABLE_SV_FEATURES
-    assert(req.randomize() with {
-    });
-    `endif /* DISABLE_SV_FEATURES */
-    finish_item(req);
+    repeat(num) begin
+        req = $iname\_transaction::type_id::create("req");
+        start_item(req);
+        `ifndef DISABLE_SV_FEATURES
+        assert(req.randomize() with {
+        });
+        `endif /* DISABLE_SV_FEATURES */
+        finish_item(req);
+    end
+    `uvm_info(get_full_name(), "Sequence completed!", UVM_LOW)
 endtask : body
 
 `endif /* __\U$class_name\E_SVH__ */
@@ -1528,6 +1697,7 @@ typedef class $iname\_adapter;
 typedef class $iname\_sequencer;
 typedef class $iname\_driver;
 typedef class $iname\_monitor;
+typedef class $iname\_coverage;
 typedef class $iname\_agent;
 typedef class $iname\_sequence;
 typedef class $iname\_passthru_sequence;
@@ -1539,6 +1709,7 @@ typedef class $iname\_passthru_sequence;
 `include "$include_name/$iname\_sequencer.svh"
 `include "$include_name/$iname\_driver.svh"
 `include "$include_name/$iname\_monitor.svh"
+`include "$include_name/$iname\_coverage.svh"
 `include "$include_name/$iname\_agent.svh"
 `include "$include_name/$iname\_sequence.svh"
 `include "$include_name/$iname\_passthru_sequence.svh"

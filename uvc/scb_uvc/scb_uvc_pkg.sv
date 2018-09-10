@@ -1,6 +1,6 @@
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-//  This file <scb_uvc_pkg.svh> is a part of <Verification> project
-//  Copyright (C) 2015  An Pham (anphambk@gmail.com)
+//  This file <scb_uvc_pkg.sv> is a part of <Verification> project
+//  Copyright (C) 2018  An Pham (anphambk@gmail.com)
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -19,11 +19,13 @@
 //------------------------------------------------------------------------------
 // PACKAGE: scb_uvc_pkg
 //
-// Contain all scoreboard for UVCs
+// Package for common scoreboard types.
 //------------------------------------------------------------------------------
-package env_uvc_pkg;
-  `include "uvm_macros.svh"
-  import uvm_pkg::*;
-  
-  `include "scb_uvc/scb_uvc.svh"
-endpackage: scb_uvc_pkg
+package scb_uvc_pkg;
+    `include "uvm_macros.svh"
+    import uvm_pkg::*;
+    import amba_axi4_uvc_pkg::*;
+    import pcie_tlp_uvc_pkg::*;
+    
+    `include "scb_uvc/scb_uvc.svh"
+endpackage : scb_uvc_pkg

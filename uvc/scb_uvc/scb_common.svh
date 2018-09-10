@@ -1,6 +1,7 @@
+
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
-//  This file <rcc_if.sv> is a part of <Verification> project
-//  Copyright (C) 2015  An Pham (anphambk@gmail.com)
+//  This file <scb_common.svh> is a part of <Verification> project
+//  Copyright (C) 2018  An Pham (anphambk@gmail.com)
 //
 //  This program is free software: you can redistribute it and/or modify
 //  it under the terms of the GNU General Public License as published by
@@ -16,17 +17,13 @@
 //  along with this program.  If not, see <http://www.gnu.org/licenses/>.
 //=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-//------------------------------------------------------------------------------
-// INTERFACE: rcc_config
-//
-// RCC interface
-//------------------------------------------------------------------------------
-interface rcc_if #(parameter NRESET = 1);
-    localparam NRESET_MAX = (NRESET > 0) ? (NRESET - 1) : 0;
-    
-    logic clk;
-    logic [NRESET_MAX:0] rst ;
-    logic [NRESET_MAX:0] rstn;
-    
-    assign rstn = ~rst;
-endinterface : rcc_if
+`ifndef __SCB_COMMON_SVH__
+`define __SCB_COMMON_SVH__
+
+`ifndef SCB_TAGW
+ `define SCB_TAGW 64
+`endif // SCB_TAGW
+
+typedef bit [`SCB_TAGW-1:0] scb_tag_t;
+
+`endif /* __SCB_COMMON_SVH__ */

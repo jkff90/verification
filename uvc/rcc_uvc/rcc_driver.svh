@@ -31,7 +31,7 @@ class rcc_driver #(int NRESET = 1) extends uvm_component;
     // Configuration object
     rcc_config #(NRESET) cfg;
     
-    protected semaphore smp [NRESET]; // semaphore for reset control
+    protected semaphore sem [NRESET]; // semaphore for reset control
     protected virtual rcc_if #(NRESET) vif;
     
     //--- factory registration ---
@@ -51,7 +51,7 @@ endclass : rcc_driver
 //------------------------------------------------------------------------------
 function rcc_driver::new(string name="rcc_driver", uvm_component parent=null);
     super.new(name, parent);
-    foreach (smp[i]) smp[i] = new(1);
+    foreach (sem[i]) sem[i] = new(1);
 endfunction : new
 
 //------------------------------------------------------------------------------
@@ -116,14 +116,16 @@ endtask : run_phase
 // Invoke a reset based on the configuration
 //------------------------------------------------------------------------------
 task rcc_driver::issue_reset(int id = 0);
-    if (!smp[id].try_get(1)) return; // there is another process has issued the coressponding reset
+    if (!sem[id].try_get(1)) return; // there is another process has issued the coressponding reset
     #(cfg.reset_delay[id]);
     if (cfg.sync_reset[id]) @(posedge vif.clk);
     vif.rst[id] <= 1'b1;
+    `uvm_info(get_full_name(), $sformatf("Reset[%0d] asserted.", id), UVM_LOW)
     #(cfg.reset_hold[id]);
     if (cfg.sync_reset[id]) @(posedge vif.clk);
     vif.rst[id] <= 1'b0;
-    smp[id].put(1);
+    `uvm_info(get_full_name(), $sformatf("Reset[%0d] deasserted.", id), UVM_LOW)
+    sem[id].put(1);
 endtask : issue_reset
 
 //------------------------------------------------------------------------------

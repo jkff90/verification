@@ -22,17 +22,17 @@
 class scb_config extends uvm_object;
   //--- attributes ---
   
-  // bit: num_pairs
-  // Number of tx-rx pairs
-  bit num_pairs = 1;
+  // int: num_pairs
+  // Number of multiple tx-rx pairs.
+  int num_pairs = 1;
   
   // bit: wait_to_end
-  // Scoreboard waits in phase_ready_to_end
+  // Scoreboard waits in phase_ready_to_end.
   bit wait_to_end = 0;
   
   // bit: wait_time_out
-  // Timeout for wait_to_end
-  time wait_timeout = 1us;
+  // Timeout for wait_to_end. Set to _zero_ for wait forever.
+  time wait_timeout = 0;
   
   //--- factory registration ---
   `uvm_object_utils(scb_config)
@@ -57,14 +57,18 @@ function void scb_config::do_copy(uvm_object rhs);
   scb_config rhs_;
   
   assert($cast(rhs_, rhs));
+  num_pairs = rhs_.num_pairs;
   wait_to_end = rhs_.wait_to_end;
+  wait_timeout = rhs_.wait_timeout;
 endfunction : do_copy
 
 //------------------------------------------------------------------------------
 // +Function: do_print
 //------------------------------------------------------------------------------
 function void scb_config::do_print(uvm_printer printer);
+  printer.print_field("Number of pairs", num_pairs, 32);
   printer.print_field("Wait to end", wait_to_end, 1);
+  printer.print_field("Wait timeout", wait_timeout, 64);
 endfunction : do_print
 
 `endif /* __SCB_CONFIG_SVH__ */

@@ -219,7 +219,10 @@ endfunction : set_reset_hold
 // Trigger the reset
 //------------------------------------------------------------------------------
 function void rcc_config::trigger_reset(int id = 0);
-    if (id < NRESET) -> reset_e[id];
+    if (id < NRESET) begin
+        `uvm_info(get_full_name(), $sformatf("Triggering reset[%0d] ...", id), UVM_LOW)
+        -> reset_e[id];
+    end
     else `uvm_warning(get_full_name(), $sformatf("Invalid reset ID: %0d", id))
 endfunction : trigger_reset
 
