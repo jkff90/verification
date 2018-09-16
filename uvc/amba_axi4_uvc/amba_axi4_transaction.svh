@@ -156,7 +156,8 @@ function string amba_axi4_transaction::convert2string();
         rw.name(), addr, data.size(), resp.name(), qos);
     foreach (data[i]) begin
         if (i >= 20) begin
-            s = {s, ".........."};
+            //s = {s, "_.........."};
+            s = $sformatf("%s_..........%X", s, data[data.size()]);
             break;
         end
         if ((i % 4 == 0) && (i != 0)) s = {s, "_"};

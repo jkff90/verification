@@ -24,6 +24,7 @@ virtual class base_test extends uvm_test;
   extern function new(string name="uvm_test", uvm_component parent=null);
   extern virtual function void build_phase(uvm_phase phase);
   extern virtual function void start_of_simulation_phase(uvm_phase phase);
+  extern virtual function void final_phase(uvm_phase phase);
   pure virtual function void create_config();
   pure virtual function void set_config();
 endclass
@@ -80,7 +81,7 @@ function void base_test::start_of_simulation_phase(uvm_phase phase);
     set_report_severity_action_hier(UVM_WARNING, UVM_DISPLAY | UVM_LOG);
     set_report_severity_action_hier(UVM_ERROR, UVM_DISPLAY | UVM_LOG | UVM_COUNT);
     set_report_severity_action_hier(UVM_FATAL, UVM_DISPLAY | UVM_LOG | UVM_EXIT);
-    env.scb.set_report_severity_action(UVM_INFO, UVM_DISPLAY | UVM_LOG);
+    env.scoreboard.set_report_severity_action(UVM_INFO, UVM_DISPLAY | UVM_LOG);
   end
 endfunction : start_of_simulation_phase
 

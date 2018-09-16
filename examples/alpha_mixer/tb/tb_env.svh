@@ -9,7 +9,7 @@ class tb_env extends uvm_env;
   avlst_video_env foreground_env;
   avlst_video_env alpha_env;
   avlst_video_env sink_env;
-  two_sides_scb #(video_transaction) scoreboard;
+  scb_txrx_fifo #(video_transaction) scoreboard;
   
   //--- local variables ---
   
@@ -39,7 +39,7 @@ function void tb_env::build_phase(uvm_phase phase);
   foreground_env = avlst_video_env::type_id::create("foreground_env", this);
   alpha_env = avlst_video_env::type_id::create("alpha_env", this);
   sink_env = avlst_video_env::type_id::create("sink_env", this);
-  scoreboard = two_sides_scb #(video_transaction)::type_id::create("scoreboard", this);
+  scoreboard = scb_txrx_fifo #(video_transaction)::type_id::create("scoreboard", this);
   super.build_phase(phase);
 endfunction : build_phase
 
