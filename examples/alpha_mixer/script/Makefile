@@ -1,8 +1,8 @@
-VLOG_OPTS := -timescale 1ns/1ns
+VLOG_OPTS := -64 -timescale 1ns/1ns
 
-VSIM_OPTS := -c -permit_unmatched_virtual_intf -l vsim.log
-VSIM_OPTS += -sv_lib $(VERILIB_HOME)/objects/i686/uvm_reg
-VSIM_OPTS += -sv_lib $(VERILIB_HOME)/objects/i686/libsknobs
+VSIM_OPTS := -c -64 -permit_unmatched_virtual_intf -l vsim.log
+VSIM_OPTS += -sv_lib $(VERILIB_HOME)/objects/$(PLATFORM)/$(ARCH)/uvm_dpi
+VSIM_OPTS += -sv_lib $(VERILIB_HOME)/objects/$(PLATFORM)/$(ARCH)/libsknobs
 
 UVM_TESTNAME := video_file_test
 UVM_VERBOSITY := UVM_LOW

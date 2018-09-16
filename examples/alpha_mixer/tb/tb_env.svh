@@ -48,8 +48,8 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void tb_env::connect_phase(uvm_phase phase);
   super.connect_phase(phase);
-  background_env.analysis_port.connect(scoreboard.tx_export);
-  sink_env.analysis_port.connect(scoreboard.rx_export);
+  background_env.analysis_port.connect(scoreboard.tx_export[0]);
+  sink_env.analysis_port.connect(scoreboard.rx_export[0]);
 endfunction : connect_phase
 
 //------------------------------------------------------------------------------

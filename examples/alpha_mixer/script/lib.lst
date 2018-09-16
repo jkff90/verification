@@ -2,7 +2,7 @@
 +incdir+$UVM_HOME/src
 +incdir+$UVC_HOME
 
-//+define+UVM_NO_DPI
++define+UVM_NO_DPI
 +define+ENABLE_ALTERA_AVALON_TRANSACTION_RECORDING
 +define+DISABLE_SV_FEATURES
 
@@ -14,6 +14,7 @@ $VERILIB_HOME/packages/sknobs/sknobs.sv
 $VERILIB_HOME/packages/toolbox/toolbox_pkg.sv
 $VERILIB_HOME/interfaces/interfaces.svh
 $UVC_HOME/uvc_pkg.sv
+$VERILIB_HOME/components/heartbeat.sv
 $VERILIB_HOME/components/altera_avalon_mm_master_bfm/altera_avalon_mm_master_bfm.sv
 $VERILIB_HOME/components/altera_avalon_mm_slave_bfm/altera_avalon_mm_slave_bfm.sv
 $VERILIB_HOME/components/altera_avalon_mm_monitor_bfm/altera_avalon_mm_monitor_assertion.sv

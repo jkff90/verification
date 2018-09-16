@@ -27,7 +27,7 @@ module hvl_top;
     uvm_config_db #(avlst_adapter)::set(null, "uvm_test_top.env.background_env.avlst", "_adapter", hdl_top.aso_background_wrapper.adapter);
     uvm_config_db #(avlst_adapter)::set(null, "uvm_test_top.env.foreground_env.avlst", "_adapter", hdl_top.aso_foreground_wrapper.adapter);
     uvm_config_db #(avlst_adapter)::set(null, "uvm_test_top.env.sink_env.avlst", "_adapter", hdl_top.asi_wrapper.adapter);
-    uvm_config_db #(avlst_adapter)::set(null, "broadcast", "backdoor", hdl_top.backdoor);
+    uvm_config_db #(virtual backdoor_if)::set(null, "broadcast", "backdoor", hdl_top.backdoor);
     run_test("base_test");
   end
   

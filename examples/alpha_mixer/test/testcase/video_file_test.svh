@@ -38,6 +38,7 @@ task video_file_test::run_phase(uvm_phase phase);
   avlst_sequence      sink_seq;
   
   phase.raise_objection(this);
+  $display("STH");
   master_seq = dut_config_sequence::type_id::create("master_seq");
   background_seq = video_file_sequence::type_id::create("background_seq");
   foreground_seq = video_file_sequence::type_id::create("foreground_seq");
