@@ -166,7 +166,6 @@ sub gen_uvc {
     &gen_coverage($iname, $type);
     &gen_agent($iname, $type);
     &gen_sequence($iname);
-    &gen_passthru_sequence($iname);
     &gen_include($iname);
     &gen_package($iname);
     &gen_interface($iname);
@@ -321,21 +320,21 @@ sub gen_config {
 class $class_name extends uvm_object;
     //--- attributes ---
     
-    // enum: is_active = UVM_PASSIVE
-    // Decide whether the agent has the driver path (sequencer+driver)
-    uvm_active_passive_enum is_active = UVM_PASSIVE;
+    // enum: is_active
+    // Decide whether the agent has the driver path (sequencer+driver). Used in build_phase.
+    uvm_active_passive_enum is_active;
     
-    // bit: has_upper_layer = 0
-    // If the protocol has upper layers, a *put\_export* for layering will be created
-    bit has_upper_layer = 0;
+    // bit: has_upper_layer
+    // If the protocol has upper layers, a *put_export* for layering will be created. Used in build_phase.
+    bit has_upper_layer;
     
-    // bit: has_monitor = 1
-    // Decide whether the agent has the monitor
-    bit has_monitor = 1;
+    // bit: has_monitor
+    // Decide whether the agent has a monitor. Used in build_phase.
+    bit has_monitor;
     
-    // bit: enable_coverage = 0
-    // Enable the coverage collector, only valid of has_monitor is one.
-    bit enable_coverage = 0;
+    // bit: enable_coverage
+    // Enable the coverage collector, only valid of has_monitor is one. Used in build_phase.
+    bit enable_coverage;
     
     //--- constraints ---
     
@@ -346,6 +345,7 @@ class $class_name extends uvm_object;
     extern function new(string name="$class_name");
     extern virtual function void do_print(uvm_printer printer);
     extern virtual function void do_copy(uvm_object rhs);
+    extern virtual function void reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -353,6 +353,10 @@ endclass : $class_name
 //------------------------------------------------------------------------------
 function $class_name\::new(string name="$class_name");
     super.new(name);
+    assert(uvm_enum_wrapper #(uvm_active_passive_enum)::from_name(sknobs::get_string({get_name(), ".is_active"}, "UVM_PASSIVE"), is_active));
+    has_upper_layer = sknobs::get_value({get_name(), ".has_upper_layer"}, 0);
+    has_monitor = sknobs::get_value({get_name(), ".has_monitor"}, 1);
+    enable_coverage = sknobs::get_value({get_name(), ".enable_coverage"}, 0);
 endfunction : new
 
 //------------------------------------------------------------------------------
@@ -377,6 +381,17 @@ function void $class_name\::do_copy(uvm_object rhs);
     has_monitor = rhs_.has_monitor;
     enable_coverage = rhs_.enable_coverage;
 endfunction : do_copy
+
+//------------------------------------------------------------------------------
+// Function: reset
+// Reset the configuration object
+//------------------------------------------------------------------------------
+function void $class_name\::reset();
+    assert(uvm_enum_wrapper #(uvm_active_passive_enum)::from_name(sknobs::get_string({get_name(), ".is_active"}, "UVM_PASSIVE"), is_active));
+    has_upper_layer = sknobs::get_value({get_name(), ".has_upper_layer"}, 0);
+    has_monitor = sknobs::get_value({get_name(), ".has_monitor"}, 1);
+    enable_coverage = sknobs::get_value({get_name(), ".enable_coverage"}, 0);
+endfunction : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -500,12 +515,21 @@ class $class_name extends uvm_sequencer #($iname\_transaction);
     // Make this visible for accessing from sequences
     $iname\_config cfg;
     
+    // event: start_e
+    // Start event. All the sequences will be blocked until this event is triggered if it is set
+    uvm_event start_e;
+    
+    protected uvm_factory factory;
+    protected uvm_sequence #($iname\_transaction) q_seqs [$];
+    
     //--- factory registration ---
     `uvm_component_utils($class_name)
     
     //--- methods ---
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
+    extern virtual function void start_of_simulation_phase(uvm_phase phase);
+    extern virtual task run_phase(uvm_phase phase);
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -520,8 +544,64 @@ endfunction : new
 //------------------------------------------------------------------------------
 function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
-    super.build_phase(phase);
 endfunction : build_phase
+
+//------------------------------------------------------------------------------
+// +Function: start_of_simulation_phase
+//------------------------------------------------------------------------------
+function void $class_name\::start_of_simulation_phase(uvm_phase phase);
+    string tmp;
+    
+    tmp = sknobs::get_string({get_full_name(), ".start_e"});
+    if (tmp != "unspecified") begin
+        start_e = uvm_event_pool::get_global(tmp);
+    end
+endfunction : start_of_simulation_phase
+
+//------------------------------------------------------------------------------
+// +Method: run_phase
+//------------------------------------------------------------------------------
+task $class_name\::run_phase(uvm_phase phase);
+    chandle iter;
+    string q_string [$];
+    uvm_object obj;
+    uvm_sequence #($iname\_transaction) seq_obj;
+    
+    // Scan through the sknobs database
+    iter = sknobs::iterate({get_full_name(), ".seqs"});
+    q_string = '{};
+    while (sknobs::iterator_next(iter)) q_string.push_back(sknobs::iterator_get_string(iter));
+    
+    // Create sequences
+    q_seqs = '{};
+    foreach (q_string[i]) begin
+        obj = factory.create_object_by_name(q_string[i]);
+        if (obj != null) begin
+            if ($cast(seq_obj, obj)) q_seqs.push_back(seq_obj);
+            else `uvm_warning(get_type_name(), {"Object is not a valid sequence type: ", q_string[i]})
+        end
+        else `uvm_warning(get_type_name(), {"Cannot create the sequence: ", q_string[i]})
+    end
+    
+    // Start sequences
+    if (q_seqs.size() > 0) begin
+        phase.raise_objection(this);
+        
+        if (start_e != null) begin
+            start_e.wait_trigger();
+        end
+        foreach (q_seqs[i]) begin
+            automatic int idx = i;
+            fork
+                q_seqs[idx].start(this);
+            join_none
+        end
+        wait fork;
+        q_seqs = '{};
+        
+        phase.drop_objection(this);
+    end
+endtask : run_phase
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -565,8 +645,12 @@ sub gen_driver {
 //------------------------------------------------------------------------------
 class $class_name extends uvm_driver #($iname\_transaction);
     //--- attributes ---
+    
     protected $iname\_config cfg;  // protect configuration objects from external access
     protected virtual $iname\_if vif; // protect interface from external access
+    
+    // On-the-fly reset control
+    protected process q_procs [$];
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -575,6 +659,7 @@ class $class_name extends uvm_driver #($iname\_transaction);
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual task run_phase(uvm_phase phase);
+    extern virtual task reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -590,21 +675,27 @@ endfunction : new
 function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     assert(uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif));
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
 // +Method: run_phase
 //------------------------------------------------------------------------------
 task $class_name\::run_phase(uvm_phase phase);
-    super.run_phase(phase);
     forever begin
         seq_item_port.get_next_item(req);
         // Drive signals
-        `uvm_info(get_full_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
+        `uvm_info(get_type_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
         seq_item_port.item_done();
     end
 endtask : run_phase
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the driver
+//------------------------------------------------------------------------------
+task $class_name\::reset();
+    `uvm_warning(get_type_name(), "Reset method is not implemented")
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -621,7 +712,11 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_driver #($iname\_transaction);
     //--- attributes ---
+    
     protected $iname\_config cfg; // protect configuration objects from external access
+    
+    // On-the-fly reset control
+    protected process q_procs [$];
     
     //--- TLM ports/exports ---
     
@@ -637,6 +732,7 @@ class $class_name extends uvm_driver #($iname\_transaction);
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual task run_phase(uvm_phase phase);
+    extern virtual task reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -652,21 +748,27 @@ endfunction : new
 function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     put_port = new("put_port", this);
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
 // +Method: run_phase
 //------------------------------------------------------------------------------
 task $class_name\::run_phase(uvm_phase phase);
-    super.run_phase(phase);
     forever begin
         seq_item_port.get_next_item(req);
         put_port.put(req);
-        `uvm_info(get_full_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
+        `uvm_info(get_type_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
         seq_item_port.item_done();
     end
 endtask : run_phase
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the driver
+//------------------------------------------------------------------------------
+task $class_name\::reset();
+    `uvm_warning(get_type_name(), "Reset method is not implemented")
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -683,8 +785,12 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_driver #($iname\_transaction);
     //--- attributes ---
+    
     protected $iname\_config cfg;   // protect configuration objects from external access
     protected $iname\_adapter adapter; // protect adapter from external access
+    
+    // On-the-fly reset control
+    protected process q_procs [$];
     
     //--- factory registration ---
     `uvm_component_utils($class_name)
@@ -693,6 +799,7 @@ class $class_name extends uvm_driver #($iname\_transaction);
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual task run_phase(uvm_phase phase);
+    extern virtual task reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -708,22 +815,28 @@ endfunction : new
 function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     assert(uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter));
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
 // +Method: run_phase
 //------------------------------------------------------------------------------
 task $class_name\::run_phase(uvm_phase phase);
-    super.run_phase(phase);
     adapter.init();
     forever begin
         seq_item_port.get_next_item(req);
         adapter.push_transaction(req);
-        `uvm_info(get_full_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
+        `uvm_info(get_type_name(), {"Sent transaction: ", req.convert2string()}, UVM_HIGH)
         seq_item_port.item_done();
     end
 endtask : run_phase
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the driver
+//------------------------------------------------------------------------------
+task $class_name\::reset();
+    `uvm_warning(get_type_name(), "Reset method is not implemented")
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -772,8 +885,12 @@ sub gen_monitor {
 //------------------------------------------------------------------------------
 class $class_name extends uvm_component;
     //--- attributes ---
+    
     protected $iname\_config cfg;  // protect configuration objects from external access
     protected virtual $iname\_if vif; // protect interface from external access
+    
+    // On-the-fly reset control
+    protected process q_procs [$];
     
     //--- TLM ports/exports ---
     
@@ -788,6 +905,7 @@ class $class_name extends uvm_component;
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual task run_phase(uvm_phase phase);
+    extern virtual task reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -804,7 +922,6 @@ function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     assert(uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif));
     analysis_port = new(\"analysis_port\", this);
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
@@ -813,14 +930,21 @@ endfunction : build_phase
 task $class_name\::run_phase(uvm_phase phase);
     $iname\_transaction trans;
     
-    super.run_phase(phase);
     forever begin
         trans = $iname\_transaction::type_id::create("trans");
         // Monitor signals
-        `uvm_info(get_full_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
+        `uvm_info(get_type_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
         analysis_port.write(trans);
     end
 endtask : run_phase
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the monitor
+//------------------------------------------------------------------------------
+task $class_name\::reset();
+    `uvm_warning(get_type_name(), "Reset method is not implemented")
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -837,7 +961,11 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_component;
     //--- attributes ---
+    
     protected $iname\_config cfg;  // protect configuration objects from external access
+    
+    // On-the-fly reset control
+    protected process q_procs [$];
     
     //--- TLM ports/exports ---
     
@@ -856,6 +984,7 @@ class $class_name extends uvm_component;
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual function void write($iname\_transaction trans);
+    extern virtual task reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -872,7 +1001,6 @@ function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     analysis_port = new("analysis_port", this);
     analysis_export = new("analysis_export", this);
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
@@ -880,9 +1008,17 @@ endfunction : build_phase
 //------------------------------------------------------------------------------
 function void $class_name\::write($iname\_transaction trans);
     // Protocol check
-    `uvm_info(get_full_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
+    `uvm_info(get_type_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
     analysis_port.write(trans);
 endfunction : write
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the monitor
+//------------------------------------------------------------------------------
+task $class_name\::reset();
+    `uvm_warning(get_type_name(), "Reset method is not implemented")
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -899,8 +1035,12 @@ END
 //------------------------------------------------------------------------------
 class $class_name extends uvm_component;
     //--- attributes ---
+    
     protected $iname\_config cfg;   // protect configuration objects from external access
     protected $iname\_adapter adapter; // protect adapter from external access
+    
+    // On-the-fly reset control
+    protected process q_procs [$];
     
     //--- TLM ports/exports ---
     
@@ -915,6 +1055,7 @@ class $class_name extends uvm_component;
     extern function new(string name="$class_name", uvm_component parent=null);
     extern virtual function void build_phase(uvm_phase phase);
     extern virtual task run_phase(uvm_phase phase);
+    extern virtual task reset();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -931,7 +1072,6 @@ function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     assert(uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter));
     analysis_port = new("analysis_port", this);
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
@@ -940,15 +1080,22 @@ endfunction : build_phase
 task $class_name\::run_phase(uvm_phase phase);
     $iname\_transaction trans;
     
-    super.run_phase(phase);
     adapter.wait_init();
     forever begin
         trans = $iname\_transaction::type_id::create("trans");
         adapter.pop_transaction(trans);
-        `uvm_info(get_full_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
+        `uvm_info(get_type_name(), {"Received transaction: ", trans.convert2string()}, UVM_HIGH)
         analysis_port.write(trans);
     end
 endtask : run_phase
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the monitor
+//------------------------------------------------------------------------------
+task $class_name\::reset();
+    `uvm_warning(get_type_name(), "Reset method is not implemented")
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -1029,7 +1176,6 @@ endfunction : new
 function void $class_name\::build_phase(uvm_phase phase);
     assert(uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg));
     analysis_export = new("analysis_export", this);
-    super.build_phase(phase);
 endfunction : build_phase
 
 //------------------------------------------------------------------------------
@@ -1123,6 +1269,7 @@ class $class_name extends uvm_agent;
     extern virtual function void connect_phase(uvm_phase phase);
     extern virtual function void start_of_simulation_phase(uvm_phase phase);
     extern virtual task put($iname\_transaction t);
+    extern virtual task reset(bit reset_cfg=0);
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -1139,13 +1286,12 @@ function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
     if (cfg == null) begin
         if (!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
-            `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-            cfg = $iname\_config::type_id::create("cfg");
+            cfg = $iname\_config::type_id::create({get_full_name(), ".cfg"});
         end
     end
     if (vif == null) begin
         if (!uvm_config_db #(virtual $iname\_if)::get(this, "", "vif", vif)) begin
-            `uvm_fatal(get_full_name(), "Virtual interface is not assigned to this agent.")
+            `uvm_fatal(get_type_name(), "Virtual interface is not assigned to this agent.")
         end
     end
     // Start building
@@ -1163,7 +1309,6 @@ function void $class_name\::build_phase(uvm_phase phase);
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
-    super.build_phase(phase);
     // Set configurations
     if (cfg.is_active == UVM_ACTIVE) begin
         uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
@@ -1183,7 +1328,6 @@ endfunction : build_phase
 // +Function: connect_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
-    super.connect_phase(phase);
     if (cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
     end
@@ -1199,8 +1343,7 @@ endfunction : connect_phase
 // +Function: start_of_simulation_phase
 //------------------------------------------------------------------------------
 function void $class_name\::start_of_simulation_phase(uvm_phase phase);
-    super.start_of_simulation_phase(phase);
-    `uvm_info(get_full_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
+    `uvm_info(get_type_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
 endfunction : start_of_simulation_phase
 
 //------------------------------------------------------------------------------
@@ -1209,6 +1352,29 @@ endfunction : start_of_simulation_phase
 task $class_name\::put($iname\_transaction t);
     sequencer.execute_item(t);
 endtask : put
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the agent, call all reset methods of its children.
+// This task is used to reset the agent and reload the configuration without
+// affecting the bus.
+//------------------------------------------------------------------------------
+task $class_name\::reset(bit reset_cfg=0);
+    if (reset_cfg) begin
+        cfg.reset();
+    end
+    if (cfg.is_active == UVM_ACTIVE) begin
+        fork
+            driver.reset();
+        join_none
+    end
+    if (cfg.has_monitor == 1'b1) begin
+        fork
+            monitor.reset();
+        join_none
+    end
+    wait fork;
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -1271,6 +1437,7 @@ class $class_name extends uvm_agent;
     extern virtual function void connect_phase(uvm_phase phase);
     extern virtual function void start_of_simulation_phase(uvm_phase phase);
     extern virtual task put($iname\_transaction t);
+    extern virtual task reset(bit reset_cfg=0);
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -1287,8 +1454,7 @@ function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
     if (cfg == null) begin
         if (!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
-            `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-            cfg = $iname\_config::type_id::create("cfg");
+            cfg = $iname\_config::type_id::create({get_full_name(), ".cfg"});
         end
     end
     // Start building
@@ -1308,7 +1474,6 @@ function void $class_name\::build_phase(uvm_phase phase);
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
-    super.build_phase(phase);
     // Set configurations
     if (cfg.is_active == UVM_ACTIVE) begin
         uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
@@ -1326,7 +1491,6 @@ endfunction : build_phase
 // +Function: connect_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
-    super.connect_phase(phase);
     if (cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
         driver.put_port.connect(put_port);
@@ -1344,8 +1508,7 @@ endfunction : connect_phase
 // +Function: start_of_simulation_phase
 //------------------------------------------------------------------------------
 function void $class_name\::start_of_simulation_phase(uvm_phase phase);
-    super.start_of_simulation_phase(phase);
-    `uvm_info(get_full_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
+    `uvm_info(get_type_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
 endfunction : start_of_simulation_phase
 
 //------------------------------------------------------------------------------
@@ -1354,6 +1517,29 @@ endfunction : start_of_simulation_phase
 task $class_name\::put($iname\_transaction t);
     sequencer.execute_item(t);
 endtask : put
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the agent, call all reset methods of its children.
+// This task is used to reset the agent and reload the configuration without
+// affecting the bus.
+//------------------------------------------------------------------------------
+task $class_name\::reset(bit reset_cfg=0);
+    if (reset_cfg) begin
+        cfg.reset();
+    end
+    if (cfg.is_active == UVM_ACTIVE) begin
+        fork
+            driver.reset();
+        join_none
+    end
+    if (cfg.has_monitor == 1'b1) begin
+        fork
+            monitor.reset();
+        join_none
+    end
+    wait fork;
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -1410,6 +1596,7 @@ class $class_name extends uvm_agent;
     extern virtual function void connect_phase(uvm_phase phase);
     extern virtual function void start_of_simulation_phase(uvm_phase phase);
     extern virtual task put($iname\_transaction t);
+    extern virtual task reset(bit reset_cfg=0);
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -1426,13 +1613,12 @@ function void $class_name\::build_phase(uvm_phase phase);
     // Get configurations
     if (cfg == null) begin
         if (!uvm_config_db #($iname\_config)::get(this, "", "cfg", cfg)) begin
-            `uvm_warning(get_full_name(), "Configuration object is not set to this agent, creating one with default fields.")
-            cfg = $iname\_config::type_id::create("cfg");
+            cfg = $iname\_config::type_id::create({get_full_name(), ".cfg"});
         end
     end
     if (adapter == null) begin
         if (!uvm_config_db #($iname\_adapter)::get(this, "", "adapter", adapter)) begin
-            `uvm_fatal(get_full_name(), "Adapter is not assigned to this agent.")
+            `uvm_fatal(get_type_name(), "Adapter is not assigned to this agent.")
         end
     end
     // Start building
@@ -1450,7 +1636,6 @@ function void $class_name\::build_phase(uvm_phase phase);
         put_export = new("put_export", this);
     end
     analysis_port = new("analysis_port", this);
-    super.build_phase(phase);
     // Set configurations
     if (cfg.is_active == UVM_ACTIVE) begin
         uvm_config_db #($iname\_config)::set(this, "sequencer", "cfg", cfg);
@@ -1470,7 +1655,6 @@ endfunction : build_phase
 // +Function: connect_phase
 //------------------------------------------------------------------------------
 function void $class_name\::connect_phase(uvm_phase phase);
-    super.connect_phase(phase);
     if (cfg.is_active == UVM_ACTIVE) begin
         driver.seq_item_port.connect(sequencer.seq_item_export);
     end
@@ -1486,8 +1670,7 @@ endfunction : connect_phase
 // +Function: start_of_simulation_phase
 //------------------------------------------------------------------------------
 function void $class_name\::start_of_simulation_phase(uvm_phase phase);
-    super.start_of_simulation_phase(phase);
-    `uvm_info(get_full_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
+    `uvm_info(get_type_name(), \$sformatf("Printing configuration:\\n%s", cfg.sprint()), UVM_LOW)
 endfunction : start_of_simulation_phase
 
 //------------------------------------------------------------------------------
@@ -1496,6 +1679,29 @@ endfunction : start_of_simulation_phase
 task $class_name\::put($iname\_transaction t);
     sequencer.execute_item(t);
 endtask : put
+
+//------------------------------------------------------------------------------
+// Method: reset
+// Reset the agent, call all reset methods of its children.
+// This task is used to reset the agent and reload the configuration without
+// affecting the bus.
+//------------------------------------------------------------------------------
+task $class_name\::reset(bit reset_cfg=0);
+    if (reset_cfg) begin
+        cfg.reset();
+    end
+    if (cfg.is_active == UVM_ACTIVE) begin
+        fork
+            driver.reset();
+        join_none
+    end
+    if (cfg.has_monitor == 1'b1) begin
+        fork
+            monitor.reset();
+        join_none
+    end
+    wait fork;
+endtask : reset
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -1538,9 +1744,9 @@ sub gen_sequence {
 class $class_name extends uvm_sequence #($iname\_transaction);
     //--- attributes ---
     
-    // int: num
+    // int: n_items
     // Number of transactions will be sent
-    int num = 100;
+    int n_items;
     
     //--- factory registration ---
     `uvm_object_utils($class_name)
@@ -1548,7 +1754,9 @@ class $class_name extends uvm_sequence #($iname\_transaction);
     
     //--- methods ---
     extern function new(string name="$class_name");
+    extern virtual task pre_body();
     extern virtual task body();
+    extern virtual task post_body();
 endclass : $class_name
 
 //------------------------------------------------------------------------------
@@ -1556,13 +1764,21 @@ endclass : $class_name
 //------------------------------------------------------------------------------
 function $class_name\::new(string name="$class_name");
     super.new(name);
+    n_items = sknobs::get_value({get_name(), ".n_items"}, 100);
 endfunction : new
+
+//------------------------------------------------------------------------------
+// +Method: pre_body
+//------------------------------------------------------------------------------
+task $class_name\::pre_body();
+    `uvm_info(get_type_name(), "Sequence started", UVM_LOW)
+endtask : pre_body
 
 //------------------------------------------------------------------------------
 // +Method: body
 //------------------------------------------------------------------------------
 task $class_name\::body();
-    repeat(num) begin
+    repeat (n_items) begin
         req = $iname\_transaction::type_id::create("req");
         start_item(req);
         `ifndef DISABLE_SV_FEATURES
@@ -1571,96 +1787,15 @@ task $class_name\::body();
         `endif /* DISABLE_SV_FEATURES */
         finish_item(req);
     end
-    `uvm_info(get_full_name(), "Sequence completed!", UVM_LOW)
+    `uvm_info(get_type_name(), "Sequence completed!", UVM_LOW)
 endtask : body
 
-`endif /* __\U$class_name\E_SVH__ */
-END
-
-    update_header("$class_name.svh");
-    open(FILE, ">$class_name.svh");
-    print "Generating $class_name.svh .....\n";
-    print(FILE $header);
-    print(FILE $body);
-    print(FILE $footer);
-    close(FILE);
-}
-
-
-#===============================================================================
-# Subroutine: gen_passthru_sequence
-#
-# Descriptions:
-#   + Generate protocol UVC pass-through sequence
-#
-# Inputs:
-#   + Name of the protocol
-#
-# Outputs:
-#   + None
-#===============================================================================
-sub gen_passthru_sequence {
-    my($iname) = @_;
-    my $class_name = $iname."_passthru_sequence";
-    my $body = <<END;
-`ifndef __\U$class_name\E_SVH__
-`define __\U$class_name\E_SVH__
-
 //------------------------------------------------------------------------------
-// CLASS: $class_name
-//
-// Pass through sequence for $iname protocol. For more information, please refer
-// to the paper <"Beyond UVM: Creating Truly Reusable Protocol Layering"
-// at http://www.verilog.org/mantis/file_download.php?file_id=5903&type=bug>
+// +Method: post_body
 //------------------------------------------------------------------------------
-class $class_name extends uvm_sequence #($iname\_transaction);
-    //--- attributes ---
-    
-    // variable: sequence_started
-    // This event indicates that the sequence has started
-    event sequence_started;
-    
-    // variable: start_transaction
-    // Trigger this event to start sending the transaction
-    event start_transaction;
-    
-    // variable: finish_transaction
-    // This event indicates that the transaction has been sent
-    event finish_transaction;
-    
-    protected $iname\_transaction trans;
-    
-    //--- factory registration ---
-    `uvm_object_utils($class_name)
-    `uvm_declare_p_sequencer($iname\_sequencer)
-    
-    //--- methods ---
-    extern function new(string name="$class_name");
-    extern virtual task body();
-endclass : $class_name
-
-//------------------------------------------------------------------------------
-// +Constructor: new
-//------------------------------------------------------------------------------
-function $class_name\::new(string name="$class_name");
-    super.new(name);
-    trans = $iname\_transaction::type_id::create("trans");
-endfunction : new
-
-//------------------------------------------------------------------------------
-// +Method: body
-//------------------------------------------------------------------------------
-task $class_name\::body();
-    -> sequence_started;
-    forever begin
-        @(start_transaction);
-        req = $iname\_transaction::type_id::create("req");
-        start_item(req);
-        req.copy(trans);
-        finish_item(req);
-        -> finish_transaction;
-    end
-endtask : body
+task $class_name\::post_body();
+    `uvm_info(get_type_name(), "Sequence completed", UVM_LOW)
+endtask : post_body
 
 `endif /* __\U$class_name\E_SVH__ */
 END
@@ -1700,7 +1835,6 @@ typedef class $iname\_monitor;
 typedef class $iname\_coverage;
 typedef class $iname\_agent;
 typedef class $iname\_sequence;
-typedef class $iname\_passthru_sequence;
 
 `include "$include_name/$iname\_common.svh"
 `include "$include_name/$iname\_transaction.svh"
@@ -1712,7 +1846,6 @@ typedef class $iname\_passthru_sequence;
 `include "$include_name/$iname\_coverage.svh"
 `include "$include_name/$iname\_agent.svh"
 `include "$include_name/$iname\_sequence.svh"
-`include "$include_name/$iname\_passthru_sequence.svh"
 END
 
     #update_header("$include_name.svh");
@@ -1749,6 +1882,7 @@ sub gen_package {
 package $package_name;
     `include "uvm_macros.svh"
     import uvm_pkg::*;
+    import sknobs::*;
     
     `include "$iname\_uvc/$iname\_uvc.svh"
 endpackage : $package_name
@@ -1786,6 +1920,9 @@ sub gen_interface {
 // Interface for $iname protocol
 //------------------------------------------------------------------------------
 interface $interface_name;
+    default clocking cb @();
+        default output negedge;
+    endclocking : cb
 endinterface : $interface_name
 END
 
